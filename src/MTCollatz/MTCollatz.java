@@ -1,5 +1,10 @@
 package MTCollatz;
 
+// Imports direct from project description
+import java.lang.Thread;
+import java.time.Instant;
+import java.util.concurrent.locks.ReentrantLock;
+
 public class MTCollatz implements Runnable {
   private int counter = 0;
   private int collatzRange;
