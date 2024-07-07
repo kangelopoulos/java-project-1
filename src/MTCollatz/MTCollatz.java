@@ -2,6 +2,7 @@ package MTCollatz;
 
 import java.lang.Thread;
 import java.time.Instant;
+import java.time.temporal.Temporal;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
@@ -45,7 +46,6 @@ public class MTCollatz implements Runnable {
    */
   private Thread[] threads;
 
-
   /**
 	 * Constructs an MTCollatz object
 	 * @param threadCount  the number of threads to generate
@@ -55,7 +55,7 @@ public class MTCollatz implements Runnable {
   public MTCollatz(int threadCount, int collatzRange) throws InterruptedException {
     this.collatzRange = collatzRange;
     this.threads = new Thread[threadCount];
-
+    Instant start = Instant.now();
     // Create and start all threads
     for (int i = 0; i < threadCount; i++) {
       threads[i] = new Thread(this);
@@ -66,7 +66,9 @@ public class MTCollatz implements Runnable {
     for (int i = 0; i < threadCount; i++) {
       threads[i].join();
     }
+    Instant end = Instant.now();
 
+    System.err.println(this.collatzRange + "," + threadCount + "," + (double)(end.toEpochMilli() - start.toEpochMilli())/1000);
     // Print the collatz histogram as specified in requirements.
     for (int i = 1; i < this.collatzStoppingTimeHistogram.length; i++) {
       System.out.println((i) + "," + this.collatzStoppingTimeHistogram[i]);
