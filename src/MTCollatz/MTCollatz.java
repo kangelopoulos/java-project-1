@@ -1,63 +1,164 @@
 package MTCollatz;
 
-// Imports direct from project description
 import java.lang.Thread;
 import java.time.Instant;
 import java.util.concurrent.locks.ReentrantLock;
 
+/**
+A named concrete MTCollatz class that accepts a range and number of 
+threads and creates that number of threads to cooperatively calculate 
+a histogram csv of stopping times.
+@author Katharine Angelopoulos and Cody Delaney
+@version 1.0
+
+COP5518 Project 1
+File Name: MTCollatz.java
+*/ 
 public class MTCollatz implements Runnable {
+  /**
+   * Reentrant lock for the counter that increments from 1 to the collatz range.
+   */
+  private final ReentrantLock counterLock = new ReentrantLock();
+
+  /**
+   * Reentrant lock for the collatz histogram array.
+   */
+  private final ReentrantLock histogramLock = new ReentrantLock();
+
+  /**
+   * Counter that increments by 1 across the collatz range.
+   */
   private int counter = 0;
+
+  /**
+   * The max range for the collatz histogram calculation.
+   */
   private int collatzRange;
-  private int[] collatzStoppingTimeHistogram;
+
+  /**
+   * Array storing values for the collatz stopping time histogram.
+   */
+  private int[] collatzStoppingTimeHistogram = new int[1001];
+
+  /**
+   * Array to hold the threads performing the calculations.
+   */
   private Thread[] threads;
 
 
-  public static void main(String[] args) {
-    int collatzRange = Integer.parseInt(args[0]);
-    int threadCount = Integer.parseInt(args[1]);
-
-    System.out.println("Collatz Range: " + collatzRange);
-    System.out.println("Thread Count: " + threadCount);
-
-    MTCollatz mtCollatz = new MTCollatz(4, 1000);
-    System.out.println("done");
-  }
-
-  public MTCollatz(int threadCount, int collatzRange) {
+  /**
+	 * Constructs an MTCollatz object
+	 * @param threadCount  the number of threads to generate
+   * @param collatzRange  the max range for the collatz calculation
+   * @throws InterruptedException  throws an interrupted exception
+	 */
+  public MTCollatz(int threadCount, int collatzRange) throws InterruptedException {
     this.collatzRange = collatzRange;
-    threads = new Thread[threadCount];
+    this.threads = new Thread[threadCount];
 
+    // Create and start all threads
     for (int i = 0; i < threadCount; i++) {
       threads[i] = new Thread(this);
       threads[i].start();
-      System.out.println("Thread Created: " + threads[i].getName());
+    }
+
+    // Wait for all threads to finish
+    for (int i = 0; i < threadCount; i++) {
+      threads[i].join();
+    }
+
+    // Print the collatz histogram as specified in requirements.
+    for (int i = 1; i < this.collatzStoppingTimeHistogram.length; i++) {
+      System.out.println((i) + "," + this.collatzStoppingTimeHistogram[i]);
     }
   }
 
-  public void run() {
-    // Loop through -
-      // Get counter value (lock) 
-      // Check if counter === array length 
-      // if so, stop
-      // else
-        // Compute collatz stopping time for number
-        // Mutate array[counter] with stopping time
-        // increment counter (needs lock)
+  /**
+	 * Gets the counter with mutual exclusion 
+	 * @return  the current counter (incremented by one)
+	 */
+  public int getCounter() {
+    counterLock.lock();
+    try {
+      return ++this.counter;
+    } finally {
+      counterLock.unlock();
+    }
   }
 
-  public static int getCollatzStoppingTimeForNumber(int number) {
-    int stoppingTime = 0;
+  /**
+	 * Gets the range for the collatz calculation
+	 * @return  the range for the collatz calculation
+	 */
+  public int getCollatzRange() {
+    return this.collatzRange;
+  }
 
-    while (number != 1) {
-      if (number % 2 == 0) {
-        number = number / 2;
-      } else {
-        number = ( 3 * number ) + 1;
+  /**
+	 * Updates the collatz stopping time histogram with mutual exclusion
+	 * @param stoppingTime  the stopping time for a collatz calculation
+	 */
+  public synchronized void updateCollatzStoppingTimeHistogram(int stoppingTime) {
+    histogramLock.lock();
+    try {
+      this.collatzStoppingTimeHistogram[stoppingTime]++;
+    } finally {
+      histogramLock.unlock();
+    }
+  }
+
+  /**
+	 * Runs the threads, performing collatz operations cooperatively
+	 */
+  @Override
+  public void run() {
+    while (true) {
+      // Get the current counter value and the max range
+      int index = this.getCounter();
+      int range = this.getCollatzRange();
+
+      // If the index exceeds the range, stop working
+      if (index > range) {
+        break;
       }
-      stoppingTime++;
+
+      // Calculate the collatz stopping time and update the histogram array
+      int stoppingTime = this.getCollatzStoppingTimeForNumber(index);
+      this.updateCollatzStoppingTimeHistogram(stoppingTime);
+    }
+  }
+
+  /**
+	 * Calculates the collatz stopping time for a number
+	 * @param number  the number to perform a collatz stopping time calculation on
+   * @return  the calculated collatz stopping time
+	 */
+  public int getCollatzStoppingTimeForNumber(int number) {
+    int stoppingTime = 0; // stopping time is the least number of steps for number to reach 1
+    long hold = number; // long is required because the algorithm exceeds the limits of int
+
+    while (hold != 1) { // break when number reaches 1
+      if (hold % 2 == 0) { // if even, divide number by 2
+        hold = hold / 2;
+      } else { // if odd, multiply number by 3 and add 1
+        hold = ( 3 * hold ) + 1;
+      }
+      stoppingTime++; // increment stopping time
     }
 
     return stoppingTime;
   }
 
+  /**
+   * The main method
+   * @param args - 0: collatz range for calculation, 1: number of requested threads 
+   */
+  public static void main(String[] args) {
+    int collatzRange = Integer.parseInt(args[0]);
+    int threadCount = Integer.parseInt(args[1]);
+
+    try {
+      new MTCollatz(threadCount, collatzRange);
+    } catch (InterruptedException e) {}
+  }
 }
